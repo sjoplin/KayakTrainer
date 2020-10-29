@@ -1,6 +1,6 @@
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
-import { Vector3, Color3, Vector2 } from "@babylonjs/core/Maths/math";
+import { Vector3, Color3, Vector2, Quaternion } from "@babylonjs/core/Maths/math";
 import { FreeCamera } from "@babylonjs/core/Cameras/freeCamera";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { Mesh } from "@babylonjs/core/Meshes";
@@ -14,11 +14,17 @@ import { WebXRFeaturesManager } from "@babylonjs/core/XR/webXRFeaturesManager";
 // Required side effects to populate the Create methods on the mesh class. Without this, the bundle would be smaller but the createXXX methods from mesh would not be accessible.
 import {MeshBuilder} from  "@babylonjs/core/Meshes/meshBuilder";
 import { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience";
+import { GenericPad } from "@babylonjs/core/Gamepads/gamepad";
+import { DualShockButton, DualShockPad, PoseEnabledController, UtilityLayerRenderer, WebVRController, WebXRControllerComponent, WebXRInputSource, Xbox360Button, Xbox360Pad } from "@babylonjs/core";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement; // Get the canvas element 
 const engine = new Engine(canvas, true); // Generate the BABYLON 3D engine
+let controllerOffset: Vector3;
+let paddleCenter: Vector3 = new Vector3(0, 3, 3);
 
-
+let leftController: WebXRInputSource;
+let rightController: WebXRInputSource;
+let paddle: Mesh;
 /******* Add the Playground Class with a static CreateScene function ******/
 
 const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
@@ -72,11 +78,12 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     const xrHelper: WebXRDefaultExperience = await scene.createDefaultXRExperienceAsync({
         floorMeshes: [waterMesh]
     });
+    //Disabling Teleportation
+    xrHelper.teleportation.detach();
     const availableFeatures = WebXRFeaturesManager.GetAvailableFeatures();
 
     // Video
     var forwardScreen = Mesh.CreatePlane('Forward', 1, scene)
-    
     forwardScreen.position.y = 1;
     forwardScreen.position.z = 3;
     forwardScreen.rotateAround(new Vector3(0, 1, 0), new Vector3(0, 1, 0), Math.PI/4)
@@ -87,16 +94,47 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     forwardMat.emissiveColor = new Color3(1,1,1);
     forwardMat.diffuseTexture = forwardTexture;
     forwardScreen.material = forwardMat;
-    // forwardMat.emissiveColor = new Color3(1, 1, 1);
+
+    paddle = Mesh.CreateCylinder('paddle', 1.97, .1, .1, 24, 1, scene, true)
+    
+    paddle.position = paddleCenter;
 
     scene.onPointerObservable.add((pointerInfo) => {
         switch (pointerInfo.type) {
             case PointerEventTypes.POINTERDOWN:
-                forwardTexture.video.play();
+                if (forwardTexture.video.paused) {
+                    forwardTexture.video.play();
+                } else {
+                    forwardTexture.video.pause();
+                }
             break
         }
     });
 
+    xrHelper.input.onControllerAddedObservable.add((xrController)=> {
+    
+        xrController.onMotionControllerInitObservable.add((motionController)=>{
+            if (motionController.handness == 'left') {
+                leftController = xrController;
+            } else {
+                rightController = xrController;
+            }
+            
+            const triggerComponent = motionController.getMainComponent();
+            const buttonComponent = motionController.getComponentOfType(WebXRControllerComponent.BUTTON_TYPE)
+                
+            buttonComponent?.onButtonStateChangedObservable.add((component) => {
+                // Call calibration
+                if(component.changes.pressed?.current) {
+                    calibrateControllers();
+                }
+            });
+            triggerComponent.onButtonStateChangedObservable.add((component) => {
+                console.log(component);
+            })
+            
+        });
+    })
     return scene;
 }
 
@@ -116,3 +154,31 @@ const scene = createScene(engine,
     
         }
     )
+
+
+const calibrateControllers = function() {
+    const numIters = 100;
+    let left: Vector3 = leftController.grip!.position.scale(1/numIters);
+    let right: Vector3 = rightController.grip!.position.scale(1/numIters);
+    
+    for(let i=1; i <numIters; i++) {
+        let temp = leftController.grip!.position;
+        left.addInPlace(temp.scale(1/numIters));
+        let temp2 = rightController.grip!.position;
+        right.addInPlace(temp2.scale(1/numIters));
+    }
+    controllerOffset = left.subtract(right);
+    paddleCenter = Vector3.Center(left, right);
+    
+    paddle.position = paddleCenter;
+    var dx = paddleCenter.x - left.x;
+    var dy = paddleCenter.y - left.y;
+    var dz = left.z - paddleCenter.z;
+    paddle.rotation.z = Math.atan(dy/dx) + Math.PI/2;
+    paddle.rotation.y = Math.atan(dz/dx);
+    paddle.rotation.x = right.x;
+    rightController.motionController!.rootMesh!.rotation = new Vector3(0, 0, Math.PI/2);
+    leftController.motionController!.rootMesh!.rotation = new Vector3(0, 0, Math.PI/2);
+    rightController.motionController!.rootMesh!.addChild(paddle);
+    rightController.motionController!.rootMesh!.addChild(leftController.motionController!.rootMesh!)
+}
