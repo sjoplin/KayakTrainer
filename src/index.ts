@@ -47,13 +47,18 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                 if (stateManager.controllersReady) {
                     calibrateControllers();
                 }
-                console.log(stateManager.leftIn)
+                if (stateManager.leftIn) {
+                    console.log('left in');
+                }
+                if (stateManager.rightIn) {
+                    console.log('right in');
+                }
             }
         )
     );
 
     
-    var camera = new FreeCamera("Camera1", new Vector3(0, 100, 0), scene);
+    var camera = new FreeCamera("Camera1", new Vector3(0, 0, 0), scene);
     camera.attachControl(canvas, true);
 
     var light = new HemisphericLight("light1", new Vector3(0, 1, 1), scene);
