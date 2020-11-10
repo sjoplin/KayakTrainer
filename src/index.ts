@@ -188,7 +188,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
             }
             
             const triggerComponent = motionController.getMainComponent();
-            const buttonComponent = motionController.getComponentOfType(WebXRControllerComponent.BUTTON_TYPE)
+            const buttonComponent = motionController.getComponentOfType('squeeze');
                 
             buttonComponent?.onButtonStateChangedObservable.add((component) => {
                 // Call calibration
