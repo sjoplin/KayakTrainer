@@ -253,14 +253,23 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
             }
             
             const triggerComponent = motionController.getMainComponent();
-            const buttonComponent = motionController.getComponentOfType(WebXRControllerComponent.BUTTON_TYPE)
-                
-            buttonComponent?.onButtonStateChangedObservable.add((component) => {
-                // Call calibration
-                if(component.changes.pressed?.current) {
-                    stateManager.controllersReady = true
-                }
-            });
+            if (motionController.getComponentOfType('button') != null) {
+                const buttonComponent = motionController.getComponentOfType(WebXRControllerComponent.BUTTON_TYPE)
+                buttonComponent?.onButtonStateChangedObservable.add((component) => {
+                    // Call calibration
+                    if(component.changes.pressed?.current) {
+                        stateManager.controllersReady = true
+                    }
+                });
+            } else {
+                const squeezeComponent = motionController.getComponentOfType('squeeze')
+                squeezeComponent?.onButtonStateChangedObservable.add((component) => {
+                    // Call calibration
+                    if(component.changes.pressed?.current) {
+                        stateManager.controllersReady = true
+                    }
+                });
+            }
             // triggerComponent.onButtonStateChangedObservable.add((component) => {
             //     console.log(component);
             // })
