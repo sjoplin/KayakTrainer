@@ -14,8 +14,9 @@ import { WebXRFeaturesManager } from "@babylonjs/core/XR/webXRFeaturesManager";
 // Required side effects to populate the Create methods on the mesh class. Without this, the bundle would be smaller but the createXXX methods from mesh would not be accessible.
 import {MeshBuilder} from  "@babylonjs/core/Meshes/meshBuilder";
 import { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience";
-import { GenericPad } from "@babylonjs/core/Gamepads/gamepad";
-import { DualShockButton, DualShockPad, PoseEnabledController, UtilityLayerRenderer, WebVRController, WebXRControllerComponent, WebXRInputSource, Xbox360Button, Xbox360Pad } from "@babylonjs/core";
+import { WebXRControllerComponent, WebXRInputSource } from "@babylonjs/core/XR";
+import { ActionManager } from "@babylonjs/core/Actions/actionManager";
+import { SwitchBooleanAction, ExecuteCodeAction } from "@babylonjs/core/Actions";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement; // Get the canvas element 
 const engine = new Engine(canvas, true); // Generate the BABYLON 3D engine
@@ -24,12 +25,32 @@ let paddleCenter: Vector3 = new Vector3(0, 3, 3);
 
 let leftController: WebXRInputSource;
 let rightController: WebXRInputSource;
+var stateManager = {
+    controllersReady: false,
+    leftIn: false,
+    rightIn: false
+}
+
 let paddle: Mesh;
+
 /******* Add the Playground Class with a static CreateScene function ******/
 
 const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     // Create the scene space
     const scene = new Scene(engine);
+    scene.actionManager = new ActionManager(scene);
+    
+    scene.actionManager.registerAction(
+        new ExecuteCodeAction(
+            ActionManager.OnEveryFrameTrigger,
+            function() {
+                if (stateManager.controllersReady) {
+                    calibrateControllers();
+                }
+                console.log(stateManager.leftIn)
+            }
+        )
+    );
 
     
     var camera = new FreeCamera("Camera1", new Vector3(0, 100, 0), scene);
@@ -63,7 +84,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     
     // Water
     var waterMesh = Mesh.CreateGround("waterMesh", 512, 512, 32, scene, false);
-    waterMesh.position.y = -1;
+    waterMesh.position.y = -.1;
     var water = new WaterMaterial("water", scene, new Vector2(512, 512));
     water.backFaceCulling = true;
     water.bumpTexture = new Texture("src/textures/waterbump.png", scene);
@@ -99,6 +120,50 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     
     paddle.position = paddleCenter;
 
+    let leftBlade = MeshBuilder.CreateBox('leftBlade', {
+        width: .3,
+        height: .55,
+        depth: .01
+    })
+    leftBlade.position = paddle.position.add(new Vector3(0, .69, 0));
+    paddle.addChild(leftBlade);
+    leftBlade.actionManager = new ActionManager(scene);
+    leftBlade.actionManager.registerAction(
+        new ExecuteCodeAction(
+            {
+                trigger: ActionManager.OnIntersectionEnterTrigger, 
+                parameter: { 
+                    mesh: waterMesh
+                }
+            }, 
+            function() {
+                console.log('Hallo')
+            }
+            // stateManager,
+            // 'leftIn'
+        )
+    );
+    let rightBlade = MeshBuilder.CreateBox('rightBlade', {
+        width: .3,
+        height: .55,
+        depth: .01
+    })
+    rightBlade.position = paddle.position.add(new Vector3(0, -.69, 0));
+    paddle.addChild(rightBlade)
+    rightBlade.actionManager = new ActionManager(scene);
+    rightBlade.actionManager?.registerAction(
+        new SwitchBooleanAction(
+            {
+                trigger: ActionManager.OnIntersectionEnterTrigger, 
+                parameter: { 
+                    mesh: waterMesh, 
+                    usePreciseIntersection: true
+                }
+            }, 
+            stateManager,
+            'rightIn'
+        )
+    );
     scene.onPointerObservable.add((pointerInfo) => {
         switch (pointerInfo.type) {
             case PointerEventTypes.POINTERDOWN:
@@ -109,11 +174,13 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                 }
             break
         }
-    });
+    })
+    
 
     xrHelper.input.onControllerAddedObservable.add((xrController)=> {
-    
+        console.log(xrController);
         xrController.onMotionControllerInitObservable.add((motionController)=>{
+            console.log(motionController)
             if (motionController.handness == 'left') {
                 leftController = xrController;
             } else {
@@ -126,12 +193,12 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
             buttonComponent?.onButtonStateChangedObservable.add((component) => {
                 // Call calibration
                 if(component.changes.pressed?.current) {
-                    calibrateControllers();
+                    stateManager.controllersReady = true
                 }
             });
-            triggerComponent.onButtonStateChangedObservable.add((component) => {
-                console.log(component);
-            })
+            // triggerComponent.onButtonStateChangedObservable.add((component) => {
+            //     console.log(component);
+            // })
             
         });
     })
@@ -157,19 +224,10 @@ const scene = createScene(engine,
 
 
 const calibrateControllers = function() {
-    const numIters = 100;
-    let left: Vector3 = leftController.grip!.position.scale(1/numIters);
-    let right: Vector3 = rightController.grip!.position.scale(1/numIters);
-    
-    for(let i=1; i <numIters; i++) {
-        let temp = leftController.grip!.position;
-        left.addInPlace(temp.scale(1/numIters));
-        let temp2 = rightController.grip!.position;
-        right.addInPlace(temp2.scale(1/numIters));
-    }
+    let left: Vector3 = leftController.grip!.position.clone();//.scale(1/numIters);
+    let right: Vector3 = rightController.grip!.position.clone();//.scale(1/numIters);
     controllerOffset = left.subtract(right);
     paddleCenter = Vector3.Center(left, right);
-    
     paddle.position = paddleCenter;
     var dx = paddleCenter.x - left.x;
     var dy = paddleCenter.y - left.y;
@@ -177,8 +235,4 @@ const calibrateControllers = function() {
     paddle.rotation.z = Math.atan(dy/dx) + Math.PI/2;
     paddle.rotation.y = Math.atan(dz/dx);
     paddle.rotation.x = right.x;
-    rightController.motionController!.rootMesh!.rotation = new Vector3(0, 0, Math.PI/2);
-    leftController.motionController!.rootMesh!.rotation = new Vector3(0, 0, Math.PI/2);
-    rightController.motionController!.rootMesh!.addChild(paddle);
-    rightController.motionController!.rootMesh!.addChild(leftController.motionController!.rootMesh!)
 }
