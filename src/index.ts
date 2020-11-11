@@ -26,11 +26,14 @@ let paddleCenter: Vector3 = new Vector3(0, 3, 3);
 let leftController: WebXRInputSource;
 let rightController: WebXRInputSource;
 // Globals for Tracking Paddle Movement
-let prevLeft: Vector3 = new Vector3();
-let prevRight: Vector3 = new Vector3();
+let delay: number = 0;
+let leftIdx = 0;
+let prevLeft: Vector3 = new Vector3(0,0,0);//[] = new Array(10);
+let rightIdx= 0;
+let prevRight: Vector3 = new Vector3(0,0,0);//[] = new Array(10);
 let leftBlade: Mesh;
 let rightBlade: Mesh;
-
+let playerAcceleration: Vector3 = new Vector3(0,0,0);
 let playerCam: WebXRCamera;
 
 //StateManager
@@ -59,22 +62,38 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
             
                 if (playerCam != undefined) {
                     if (stateManager.leftIn) {
-                        let leftVel = leftBlade.position.subtract(prevLeft);
-                        leftVel.y = 0;
-                        leftVel.x = 0;
-                        leftVel.z /= 100;
-                        playerCam.position.addInPlace(leftVel.negate());
+                        delay++;
+                        if (delay > 10) {
+                            let leftVel = leftBlade.getAbsolutePosition().subtract(prevLeft);
+                            leftVel.y = 0;
+                            leftVel.x = 0;
+                            // leftVel.z /= 160;
+                            console.log(leftVel)
+                            playerAcceleration.addInPlace(leftVel.negate());
+                        }
                         
                     } else if (stateManager.rightIn) {
-                        let rightVel = rightBlade.position.subtract(prevRight);
-                        rightVel.y = 0;
-                        rightVel.x = 0;
-                        rightVel.z /= 100;
-                        playerCam.position.addInPlace(rightVel.negate());
+                        delay++;
+                        if (delay > 10) {
+                            let rightVel = rightBlade.getAbsolutePosition().subtract(prevRight);
+                            rightVel.y = 0;
+                            rightVel.x = 0;
+                            // rightVel.z /= 160;
+                            playerAcceleration.addInPlace(rightVel.negate());
+                        }
+                    } else {
+                        delay = 0;
                     }
+                    
                 }
-                prevLeft = leftBlade.getAbsolutePosition();
-                prevRight = rightBlade.getAbsolutePosition();
+                let fps = engine.getFps()
+                playerCam.position.addInPlace(playerAcceleration.multiply(new Vector3(1/fps, 1/fps, 1/fps)));
+                playerAcceleration.multiplyInPlace(new Vector3(.992, .992, .992));
+                
+                prevLeft = leftBlade.getAbsolutePosition().clone();
+                prevRight = rightBlade.getAbsolutePosition().clone();
+                leftIdx = (leftIdx+1)%10;
+                rightIdx = (rightIdx+1)%10;
             }
         )
     );
@@ -121,7 +140,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
         height: 512,
         subdivisions: 32,
      }, scene);
-    waterMesh.position.y = 0.55;
+    waterMesh.position.y = 0.5;
     var water = new WaterMaterial("water", scene, new Vector2(512, 512));
     water.backFaceCulling = true;
     water.bumpTexture = new Texture("src/textures/waterbump.png", scene);
@@ -194,7 +213,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
             'leftIn'
         )
     );
-    prevLeft = leftBlade.position;
+    
     rightBlade = MeshBuilder.CreateBox('rightBlade', {
         width: .3,
         height: .55,
@@ -219,7 +238,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     rightBlade.actionManager?.registerAction(
         new SwitchBooleanAction(
             {
-                trigger: ActionManager.OnIntersectionEnterTrigger, 
+                trigger: ActionManager.OnIntersectionExitTrigger, 
                 parameter: { 
                     mesh: waterMesh, 
                     usePreciseIntersection: true
@@ -229,7 +248,6 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
             'rightIn'
         )
     );
-    prevRight = rightBlade.position;
     scene.onPointerObservable.add((pointerInfo) => {
         switch (pointerInfo.type) {
             case PointerEventTypes.POINTERDOWN:
@@ -308,5 +326,5 @@ const calibrateControllers = function() {
     var dz = left.z - paddleCenter.z;
     paddle.rotation.z = Math.atan(dy/dx) + Math.PI/2;
     paddle.rotation.y = Math.atan(dz/dx);
-    paddle.rotation.x = right.x;
+    paddle.rotation.x = 0;
 }
