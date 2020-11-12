@@ -1,6 +1,6 @@
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
-import { Vector3, Color3, Vector2 } from "@babylonjs/core/Maths/math";
+import { Vector3, Color3, Vector2, Quaternion } from "@babylonjs/core/Maths/math";
 import { FreeCamera } from "@babylonjs/core/Cameras/freeCamera";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { Mesh } from "@babylonjs/core/Meshes";
@@ -14,17 +14,18 @@ import { WebXRFeaturesManager } from "@babylonjs/core/XR/webXRFeaturesManager";
 // Required side effects to populate the Create methods on the mesh class. Without this, the bundle would be smaller but the createXXX methods from mesh would not be accessible.
 import {MeshBuilder} from  "@babylonjs/core/Meshes/meshBuilder";
 import { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience";
-import { WebXRCamera, WebXRControllerComponent, WebXRInputSource } from "@babylonjs/core/XR";
+import { WebXRCamera, WebXRControllerComponent, WebXRInputSource, WebXRState} from "@babylonjs/core/XR";
 import { ActionManager } from "@babylonjs/core/Actions/actionManager";
 import { SwitchBooleanAction, ExecuteCodeAction } from "@babylonjs/core/Actions";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement; // Get the canvas element 
 const engine = new Engine(canvas, true); // Generate the BABYLON 3D engine
-let controllerOffset: Vector3;
-let paddleCenter: Vector3 = new Vector3(0, 3, 3);
 
+// Paddle Related things
+let paddleCenter: Vector3 = new Vector3(0, 3, 3);
 let leftController: WebXRInputSource;
 let rightController: WebXRInputSource;
+let rotationOffset: Vector3;
 // Globals for Tracking Paddle Movement
 let delay: number = 0;
 let leftIdx = 0;
@@ -34,7 +35,9 @@ let prevRight: Vector3 = new Vector3(0,0,0);//[] = new Array(10);
 let leftBlade: Mesh;
 let rightBlade: Mesh;
 let playerAcceleration: Vector3 = new Vector3(0,0,0);
+let rotAcc: number = 0;
 let playerCam: WebXRCamera;
+let forwardDir: Vector3 = new Vector3(0,0,1);
 
 //StateManager
 var stateManager = {
@@ -61,37 +64,63 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                 }
             
                 if (playerCam != undefined) {
+                    let hips: Vector3 = playerCam.position.clone()
+                    hips.y = 0
                     if (stateManager.leftIn) {
                         delay++;
+                        let contactPoint: Vector3 = leftBlade.getAbsolutePosition().clone();
+                        contactPoint.y = 0;
+                        let contactVec: Vector3 = hips.subtract(contactPoint);
+                
                         if (delay > 10) {
-                            let leftVel = leftBlade.getAbsolutePosition().subtract(prevLeft);
-                            leftVel.y = 0;
-                            leftVel.x = 0;
-                            // leftVel.z /= 160;
-                            console.log(leftVel)
-                            playerAcceleration.addInPlace(leftVel.negate());
+                            let leftVel = contactPoint.subtract(prevLeft);
+                            let ratio = Math.min(contactVec.length()/.8, 1);
+                            let rotTorq = leftVel.multiply(new Vector3(ratio, ratio, ratio));
+                            leftVel.scaleInPlace(1-ratio);
+                            console.log(leftVel);
+                            let dot = leftVel.x * forwardDir.x + leftVel.z * forwardDir.z;
+                            if (dot < 0) {
+                                rotAcc -= rotTorq.length() * Math.PI / 90;
+                            } else {
+                                rotAcc += rotTorq.length() * Math.PI / 90;
+                            }
+                            let change = forwardDir.scale(dot);
+                            playerAcceleration.addInPlace(change.negate());
                         }
                         
                     } else if (stateManager.rightIn) {
                         delay++;
+                        let contactPoint: Vector3 = rightBlade.getAbsolutePosition().clone();
+                        contactPoint.y = 0;
+                        let contactVec: Vector3 = hips.subtract(contactPoint);
                         if (delay > 10) {
-                            let rightVel = rightBlade.getAbsolutePosition().subtract(prevRight);
-                            rightVel.y = 0;
-                            rightVel.x = 0;
-                            // rightVel.z /= 160;
-                            playerAcceleration.addInPlace(rightVel.negate());
+                            let rightVel = contactPoint.subtract(prevRight);
+                            let ratio = Math.min(contactVec.length()/.8, 1);
+                            let rotTorq = rightVel.multiply(new Vector3(ratio, ratio, ratio));
+                            rightVel.scaleInPlace(1-ratio);
+                            let dot = rightVel.x * forwardDir.x + rightVel.z * forwardDir.z;
+                            if (dot < 0) {
+                                rotAcc -= rotTorq.length() * Math.PI / 90;
+                            } else {
+                                rotAcc += rotTorq.length() * Math.PI / 90;
+                            }
+                            let change = forwardDir.scale(dot);
+                            playerAcceleration.addInPlace(change.negate());
                         }
                     } else {
                         delay = 0;
                     }
                     
                 }
-                let fps = engine.getFps()
-                playerCam.position.addInPlace(playerAcceleration.multiply(new Vector3(1/fps, 1/fps, 1/fps)));
-                playerAcceleration.multiplyInPlace(new Vector3(.992, .992, .992));
                 
+                forwardDir = forwardDir.rotateByQuaternionAroundPointToRef(Quaternion.RotationAxis(Vector3.Up() ,rotAcc),playerCam.position, forwardDir);
+                forwardDir.normalize();
+                rotAcc*=.93
+                playerAcceleration.scale(.7);
                 prevLeft = leftBlade.getAbsolutePosition().clone();
+                prevLeft.y = 0;
                 prevRight = rightBlade.getAbsolutePosition().clone();
+                prevRight.y = 0;
                 leftIdx = (leftIdx+1)%10;
                 rightIdx = (rightIdx+1)%10;
             }
@@ -259,7 +288,17 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
             break
         }
     })
-    
+    xrHelper.baseExperience.onStateChangedObservable.add((state) => {
+        switch (state) {
+            case WebXRState.IN_XR:
+                scene.registerBeforeRender(() => {
+                    (scene.activeCamera as WebXRCamera).rotationQuaternion.multiplyInPlace(Quaternion.RotationAxis(Vector3.Up(), rotAcc));
+                    let fps = engine.getFps()
+                    playerCam.position.addInPlace(playerAcceleration.multiply(new Vector3(1/fps, 1/fps, 1/fps)));
+                });
+                break;
+        }
+    })
 
     xrHelper.input.onControllerAddedObservable.add((xrController)=> {
         xrController.onMotionControllerInitObservable.add((motionController)=>{
@@ -316,15 +355,23 @@ const scene = createScene(engine,
 
 
 const calibrateControllers = function() {
-    let left: Vector3 = leftController.grip!.position.clone();//.scale(1/numIters);
-    let right: Vector3 = rightController.grip!.position.clone();//.scale(1/numIters);
-    controllerOffset = left.subtract(right);
+    let left: Vector3 = leftController.grip!.getAbsolutePosition().clone();//.scale(1/numIters);
+    let right: Vector3 = rightController.grip!.getAbsolutePosition().clone();//.scale(1/numIters);
     paddleCenter = Vector3.Center(left, right);
     paddle.position = paddleCenter;
     var dx = paddleCenter.x - left.x;
     var dy = paddleCenter.y - left.y;
     var dz = left.z - paddleCenter.z;
-    paddle.rotation.z = Math.atan(dy/dx) + Math.PI/2;
-    paddle.rotation.y = Math.atan(dz/dx);
-    paddle.rotation.x = 0;
+    // let temp = Quaternion.RotationAxis(forwardDir, Math.atan(dy/dx) + Math.PI/2).toEulerAngles()
+    // paddle.rotation.z = Math.atan(dy/dx) + Math.PI/2;
+    // // paddle.rotation.z = temp.z
+    // paddle.rotation.y = Math.atan(dz/dx);
+    paddle.rotation = new Vector3(0,Math.atan(dz/dx),Math.atan(dy/dx) + Math.PI/2)
+    if (rotationOffset === undefined) {
+        rotationOffset = paddle.rotation.subtract(rightController.grip!.absoluteRotationQuaternion.toEulerAngles());
+    }
+    // paddle.rotation.x = rightController.grip!.absoluteRotationQuaternion.toEulerAngles().add(rotationOffset).y
+    
+    
+
 }
