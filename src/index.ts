@@ -20,6 +20,7 @@ import { SwitchBooleanAction, ExecuteCodeAction } from "@babylonjs/core/Actions"
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement; // Get the canvas element 
 const engine = new Engine(canvas, true); // Generate the BABYLON 3D engine
+let first = true;
 
 // Paddle Related things
 let paddleCenter: Vector3 = new Vector3(0, 3, 3);
@@ -77,12 +78,11 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                             let ratio = Math.min(contactVec.length()/.8, 1);
                             let rotTorq = leftVel.multiply(new Vector3(ratio, ratio, ratio));
                             leftVel.scaleInPlace(1-ratio);
-                            console.log(leftVel);
-                            let dot = leftVel.x * forwardDir.x + leftVel.z * forwardDir.z;
+                            let dot = Vector3.Dot(leftVel, forwardDir)
                             if (dot < 0) {
-                                rotAcc -= rotTorq.length() * Math.PI / 90;
+                                rotAcc += rotTorq.length();
                             } else {
-                                rotAcc += rotTorq.length() * Math.PI / 90;
+                                rotAcc -= rotTorq.length();
                             }
                             let change = forwardDir.scale(dot);
                             playerAcceleration.addInPlace(change.negate());
@@ -98,11 +98,11 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                             let ratio = Math.min(contactVec.length()/.8, 1);
                             let rotTorq = rightVel.multiply(new Vector3(ratio, ratio, ratio));
                             rightVel.scaleInPlace(1-ratio);
-                            let dot = rightVel.x * forwardDir.x + rightVel.z * forwardDir.z;
+                            let dot = Vector3.Dot(rightVel, forwardDir);
                             if (dot < 0) {
-                                rotAcc -= rotTorq.length() * Math.PI / 90;
+                                rotAcc -= rotTorq.length();
                             } else {
-                                rotAcc += rotTorq.length() * Math.PI / 90;
+                                rotAcc += rotTorq.length();
                             }
                             let change = forwardDir.scale(dot);
                             playerAcceleration.addInPlace(change.negate());
@@ -113,8 +113,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                     
                 }
                 
-                forwardDir = forwardDir.rotateByQuaternionAroundPointToRef(Quaternion.RotationAxis(Vector3.Up() ,rotAcc),playerCam.position, forwardDir);
-                forwardDir.normalize();
+                
                 rotAcc*=.93
                 playerAcceleration.scale(.7);
                 prevLeft = leftBlade.getAbsolutePosition().clone();
@@ -292,9 +291,13 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
         switch (state) {
             case WebXRState.IN_XR:
                 scene.registerBeforeRender(() => {
-                    (scene.activeCamera as WebXRCamera).rotationQuaternion.multiplyInPlace(Quaternion.RotationAxis(Vector3.Up(), rotAcc));
                     let fps = engine.getFps()
-                    playerCam.position.addInPlace(playerAcceleration.multiply(new Vector3(1/fps, 1/fps, 1/fps)));
+                    let rotQuat = Quaternion.RotationAxis(Vector3.Up(), rotAcc/fps);
+                    (scene.activeCamera as WebXRCamera).rotationQuaternion.multiplyInPlace(rotQuat);
+                    forwardDir = forwardDir.rotateByQuaternionAroundPointToRef(rotQuat,playerCam.position, forwardDir);
+                    forwardDir.normalize();
+                    
+                    playerCam.position.addInPlace(playerAcceleration.scale(1/fps));
                 });
                 break;
         }
@@ -360,13 +363,19 @@ const calibrateControllers = function() {
     paddleCenter = Vector3.Center(left, right);
     paddle.position = paddleCenter;
     var dx = paddleCenter.x - left.x;
-    var dy = paddleCenter.y - left.y;
+    var len = left.subtract(right).length();
+    var dy = right.y - left.y;
     var dz = left.z - paddleCenter.z;
     // let temp = Quaternion.RotationAxis(forwardDir, Math.atan(dy/dx) + Math.PI/2).toEulerAngles()
-    // paddle.rotation.z = Math.atan(dy/dx) + Math.PI/2;
+    paddle.rotation.y = Math.atan(dz/dx)
+    if (right.x < left.x) {
+        paddle.rotation.z = Math.PI/2 + Math.atan(dy/-len);
+    } else {
+        paddle.rotation.z = Math.PI/2 + Math.atan(dy/len);
+    }   
     // // paddle.rotation.z = temp.z
-    // paddle.rotation.y = Math.atan(dz/dx);
-    paddle.rotation = new Vector3(0,Math.atan(dz/dx),Math.atan(dy/dx) + Math.PI/2)
+    
+    // paddle.rotation = new Vector3(0,Math.atan(dz/dx),Math.atan(dy/dx) + Math.PI/2)
     if (rotationOffset === undefined) {
         rotationOffset = paddle.rotation.subtract(rightController.grip!.absoluteRotationQuaternion.toEulerAngles());
     }
