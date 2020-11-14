@@ -49,6 +49,123 @@ var stateManager = {
 
 let paddle: Mesh;
 
+const createPaddle = function(waterMesh: Mesh, scene: Scene) {
+    paddle = Mesh.CreateCylinder('paddle', 1.97, .1, .1, 24, 1, scene, true)
+
+    paddle.position = paddleCenter;
+
+    leftBlade = MeshBuilder.CreateBox('leftBlade', {
+        width: .3,
+        height: .55,
+        depth: .01
+    })
+    leftBlade.position = paddle.position.add(new Vector3(0, .69, 0));
+    paddle.addChild(leftBlade);
+    leftBlade.actionManager = new ActionManager(scene);
+    leftBlade.actionManager.registerAction(
+        new SwitchBooleanAction(
+            {
+                trigger: ActionManager.OnIntersectionEnterTrigger, 
+                parameter: { 
+                    mesh: waterMesh
+                }
+            }, 
+            
+            stateManager,
+            'leftIn'
+        )
+    );
+    leftBlade.actionManager.registerAction(
+        new SwitchBooleanAction(
+            {
+                trigger: ActionManager.OnIntersectionExitTrigger, 
+                parameter: { 
+                    mesh: waterMesh
+                }
+            }, 
+            
+            stateManager,
+            'leftIn'
+        )
+    );
+    
+    rightBlade = MeshBuilder.CreateBox('rightBlade', {
+        width: .3,
+        height: .55,
+        depth: .01
+    })
+    rightBlade.position = paddle.position.add(new Vector3(0, -.69, 0));
+    paddle.addChild(rightBlade)
+    rightBlade.actionManager = new ActionManager(scene);
+    rightBlade.actionManager?.registerAction(
+        new SwitchBooleanAction(
+            {
+                trigger: ActionManager.OnIntersectionEnterTrigger, 
+                parameter: { 
+                    mesh: waterMesh, 
+                    usePreciseIntersection: true
+                }
+            }, 
+            stateManager,
+            'rightIn'
+        )
+    );
+    rightBlade.actionManager?.registerAction(
+        new SwitchBooleanAction(
+            {
+                trigger: ActionManager.OnIntersectionExitTrigger, 
+                parameter: { 
+                    mesh: waterMesh, 
+                    usePreciseIntersection: true
+                }
+            }, 
+            stateManager,
+            'rightIn'
+        )
+    );
+}
+const createVideoPillar = function(videoName: String,  pos: Vector3, scene: Scene, rotAmount: number, around: Vector3 = new Vector3(0,1,0)) {
+    var pillar = MeshBuilder.CreateBox('pillar' + videoName, {
+        width: 1.5,
+        height: 7,
+        depth: 2
+    }, scene)
+    var pillarMaterial = new StandardMaterial(videoName + 'pillar', scene)
+    pillarMaterial.diffuseColor = new Color3(0,0,0);
+    pillar.material = pillarMaterial;
+    pillar.position = pos.clone();
+    
+    var screen = Mesh.CreatePlane(videoName + 'Screen', 1, scene)
+    screen.position = pos.clone();
+    screen.position.y = 1.1
+    screen.position.z -= 1.001
+    pillar.addChild(screen)
+    pillar.rotateAround(new Vector3(0, 1, 0), around, rotAmount)
+
+    var vTexture = new VideoTexture(videoName + '', 'src/videos/' + videoName + '.mp4', scene);
+    vTexture.video.autoplay=false;
+    var vMat = new StandardMaterial('FMat', scene);
+    vMat.emissiveColor = new Color3(1,1,1);
+    vMat.diffuseTexture = vTexture;
+    screen.material = vMat;
+
+    
+    // pillar.rotateAround(new Vector3(0, 1, 0), new Vector3(0, 1, 0), Math.PI/4)
+
+    scene.onPointerObservable.add((pointerInfo) => {
+        switch (pointerInfo.type) {
+            case PointerEventTypes.POINTERDOWN:
+                console.log(playerCam.position.subtract(screen.position).length())
+                if (vTexture.video.paused && playerCam.position.subtract(screen.getAbsolutePosition()).length() < 5) {
+                    vTexture.video.play();
+                } else {
+                    vTexture.video.pause();
+                }
+            break
+        }
+    })
+}
+
 /******* Add the Playground Class with a static CreateScene function ******/
 
 const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
@@ -65,7 +182,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                 }
             
                 if (playerCam != undefined) {
-                    let hips: Vector3 = playerCam.position.clone()
+                    let hips: Vector3 = (scene.activeCamera as WebXRCamera).position.clone()
                     hips.y = 0
                     if (stateManager.leftIn) {
                         delay++;
@@ -75,47 +192,49 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                 
                         if (delay > 10) {
                             let leftVel = contactPoint.subtract(prevLeft);
-                            let ratio = Math.min(contactVec.length()/.8, 1);
-                            let rotTorq = leftVel.multiply(new Vector3(ratio, ratio, ratio));
-                            leftVel.scaleInPlace(1-ratio);
+                            let ratio = Math.min(contactVec.length()/.95, 1);
                             let dot = Vector3.Dot(leftVel, forwardDir)
+                            
                             if (dot < 0) {
-                                rotAcc += rotTorq.length();
+                                rotAcc += Math.abs(leftVel.scale(ratio).length()) / 1.5;
                             } else {
-                                rotAcc -= rotTorq.length();
+                                rotAcc -= Math.abs(leftVel.scale(ratio).length()) / 1.5 ;
                             }
-                            let change = forwardDir.scale(dot);
+                            leftVel.scaleInPlace(1-ratio);
+                            let change = forwardDir.scale(Vector3.Dot(leftVel, forwardDir));
                             playerAcceleration.addInPlace(change.negate());
                         }
                         
                     } else if (stateManager.rightIn) {
                         delay++;
+                        
                         let contactPoint: Vector3 = rightBlade.getAbsolutePosition().clone();
                         contactPoint.y = 0;
                         let contactVec: Vector3 = hips.subtract(contactPoint);
                         if (delay > 10) {
                             let rightVel = contactPoint.subtract(prevRight);
-                            let ratio = Math.min(contactVec.length()/.8, 1);
-                            let rotTorq = rightVel.multiply(new Vector3(ratio, ratio, ratio));
-                            rightVel.scaleInPlace(1-ratio);
+                            let ratio = Math.min(contactVec.length()/.95, 1);
                             let dot = Vector3.Dot(rightVel, forwardDir);
                             if (dot < 0) {
-                                rotAcc -= rotTorq.length();
+                                rotAcc -= Math.abs(rightVel.scale(ratio).length()) / 1.5;
                             } else {
-                                rotAcc += rotTorq.length();
+                                rotAcc += Math.abs(rightVel.scale(ratio).length()) / 1.5 ;
                             }
-                            let change = forwardDir.scale(dot);
+                             
+                            rightVel.scaleInPlace(1-ratio);
+                            let change = forwardDir.scale(Vector3.Dot(rightVel, forwardDir));
                             playerAcceleration.addInPlace(change.negate());
                         }
                     } else {
                         delay = 0;
+                        
                     }
                     
                 }
                 
-                
-                rotAcc*=.93
-                playerAcceleration.scale(.7);
+                console.log(forwardDir);
+                rotAcc*=.98
+                playerAcceleration.scaleInPlace(.995);
                 prevLeft = leftBlade.getAbsolutePosition().clone();
                 prevLeft.y = 0;
                 prevRight = rightBlade.getAbsolutePosition().clone();
@@ -190,103 +309,11 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     xrHelper.teleportation.detach();
     const availableFeatures = WebXRFeaturesManager.GetAvailableFeatures();
 
-    // Video
-    var forwardScreen = Mesh.CreatePlane('Forward', 1, scene)
-    forwardScreen.position.y = 1;
-    forwardScreen.position.z = 3;
-    forwardScreen.rotateAround(new Vector3(0, 1, 0), new Vector3(0, 1, 0), Math.PI/4)
-    var forwardTexture = new VideoTexture("VideoForward", 'src/videos/forward.mp4', scene);
-    forwardTexture.video.preload='auto';
+    createVideoPillar('forward', new Vector3(0, 1, 3), scene, Math.PI/4);
+    createVideoPillar('sweep', new Vector3(0, 1, 20), scene, 0)
+    createPaddle(waterMesh, scene);
     
-    var forwardMat = new StandardMaterial('FMat', scene);
-    forwardMat.emissiveColor = new Color3(1,1,1);
-    forwardMat.diffuseTexture = forwardTexture;
-    forwardScreen.material = forwardMat;
-
-    paddle = Mesh.CreateCylinder('paddle', 1.97, .1, .1, 24, 1, scene, true)
     
-    paddle.position = paddleCenter;
-
-    leftBlade = MeshBuilder.CreateBox('leftBlade', {
-        width: .3,
-        height: .55,
-        depth: .01
-    })
-    leftBlade.position = paddle.position.add(new Vector3(0, .69, 0));
-    paddle.addChild(leftBlade);
-    leftBlade.actionManager = new ActionManager(scene);
-    leftBlade.actionManager.registerAction(
-        new SwitchBooleanAction(
-            {
-                trigger: ActionManager.OnIntersectionEnterTrigger, 
-                parameter: { 
-                    mesh: waterMesh
-                }
-            }, 
-            
-            stateManager,
-            'leftIn'
-        )
-    );
-    leftBlade.actionManager.registerAction(
-        new SwitchBooleanAction(
-            {
-                trigger: ActionManager.OnIntersectionExitTrigger, 
-                parameter: { 
-                    mesh: waterMesh
-                }
-            }, 
-            
-            stateManager,
-            'leftIn'
-        )
-    );
-    
-    rightBlade = MeshBuilder.CreateBox('rightBlade', {
-        width: .3,
-        height: .55,
-        depth: .01
-    })
-    rightBlade.position = paddle.position.add(new Vector3(0, -.69, 0));
-    paddle.addChild(rightBlade)
-    rightBlade.actionManager = new ActionManager(scene);
-    rightBlade.actionManager?.registerAction(
-        new SwitchBooleanAction(
-            {
-                trigger: ActionManager.OnIntersectionEnterTrigger, 
-                parameter: { 
-                    mesh: waterMesh, 
-                    usePreciseIntersection: true
-                }
-            }, 
-            stateManager,
-            'rightIn'
-        )
-    );
-    rightBlade.actionManager?.registerAction(
-        new SwitchBooleanAction(
-            {
-                trigger: ActionManager.OnIntersectionExitTrigger, 
-                parameter: { 
-                    mesh: waterMesh, 
-                    usePreciseIntersection: true
-                }
-            }, 
-            stateManager,
-            'rightIn'
-        )
-    );
-    scene.onPointerObservable.add((pointerInfo) => {
-        switch (pointerInfo.type) {
-            case PointerEventTypes.POINTERDOWN:
-                if (forwardTexture.video.paused) {
-                    forwardTexture.video.play();
-                } else {
-                    forwardTexture.video.pause();
-                }
-            break
-        }
-    })
     xrHelper.baseExperience.onStateChangedObservable.add((state) => {
         switch (state) {
             case WebXRState.IN_XR:
@@ -380,7 +407,6 @@ const calibrateControllers = function() {
         rotationOffset = paddle.rotation.subtract(rightController.grip!.absoluteRotationQuaternion.toEulerAngles());
     }
     // paddle.rotation.x = rightController.grip!.absoluteRotationQuaternion.toEulerAngles().add(rotationOffset).y
-    
-    
 
 }
+
