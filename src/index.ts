@@ -17,6 +17,7 @@ import { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperienc
 import { WebXRCamera, WebXRControllerComponent, WebXRInputSource, WebXRState} from "@babylonjs/core/XR";
 import { ActionManager } from "@babylonjs/core/Actions/actionManager";
 import { SwitchBooleanAction, ExecuteCodeAction } from "@babylonjs/core/Actions";
+import * as GUI from 'babylonjs-gui';
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement; // Get the canvas element 
 const engine = new Engine(canvas, true); // Generate the BABYLON 3D engine
@@ -173,6 +174,23 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     const scene = new Scene(engine);
     scene.actionManager = new ActionManager(scene);
     
+    // Information and controlls
+    var infoUi = MeshBuilder.CreatePlane("controlsUi", {width: 1, height: 1}, scene);
+    infoUi.position.y = 1.5;
+    infoUi.position.z = 2;
+    
+    var infoText = new GUI.TextBlock();
+    infoText.text = "Controls \nTrigger button: start/pause video \nAction/Squeeze button: calibrate paddles";
+    infoText.resizeToFit = true;
+    infoText.color = "white";
+    infoText.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+    infoText.fontSize = 40;
+    
+    var infoTexture = GUI.AdvancedDynamicTexture.CreateForMesh(infoUi, 1024, 1024);
+    infoTexture.addControl(infoText);
+    
+    infoUi.rotateAround(new Vector3(0, 1, 0), new Vector3(0, 1, 0), Math.PI/4)
+    
     scene.actionManager.registerAction(
         new ExecuteCodeAction(
             ActionManager.OnEveryFrameTrigger,
@@ -191,6 +209,8 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                         let contactVec: Vector3 = hips.subtract(contactPoint);
                 
                         if (delay > 10) {
+                            leftController.motionController?.pulse(1,1);
+                            console.log('haptics on left controller');
                             let leftVel = contactPoint.subtract(prevLeft);
                             let ratio = Math.min(contactVec.length()/.95, 1);
                             let dot = Vector3.Dot(leftVel, forwardDir)
@@ -212,6 +232,8 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                         contactPoint.y = 0;
                         let contactVec: Vector3 = hips.subtract(contactPoint);
                         if (delay > 10) {
+                            rightController.motionController?.pulse(1,1);
+                            console.log('haptics on right controller');
                             let rightVel = contactPoint.subtract(prevRight);
                             let ratio = Math.min(contactVec.length()/.95, 1);
                             let dot = Vector3.Dot(rightVel, forwardDir);
