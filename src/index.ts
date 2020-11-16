@@ -18,6 +18,7 @@ import { WebXRCamera, WebXRControllerComponent, WebXRInputSource, WebXRState} fr
 import { ActionManager } from "@babylonjs/core/Actions/actionManager";
 import { ExecuteCodeAction } from "@babylonjs/core/Actions";
 import * as GUI from 'babylonjs-gui';
+import { GradientMaterial } from "@babylonjs/materials";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement; // Get the canvas element 
 const engine = new Engine(canvas, true); // Generate the BABYLON 3D engine
@@ -45,32 +46,52 @@ var stateManager = {
     controllersReady: false,
     projectPaddle: false
 }
+//variables for Ducklings
+let maxDucks = 15;
+let leftDucks: Mesh[] = new Array(maxDucks);
+let rightDucks: Mesh[] = new Array(maxDucks);
+let nextDuckIdx = 0;
+let counter = 0;
+let maxCounter = 1;
+let resetCounter = 0;
 
 let paddle: Mesh;
 
+/***
+ * This creates the paddle in the environment. It is initially hidden below the map
+ */
 const createPaddle = function(waterMesh: Mesh, scene: Scene) {
-    paddle = Mesh.CreateCylinder('paddle', 1.97, .1, .1, 24, 1, scene, true)
-
+    paddle = Mesh.CreateCylinder('paddle', 1.97, .05, .05, 24, 1, scene, true)
+    let paddleMat = new StandardMaterial('paddleMat', scene);
+    paddleMat.diffuseColor = new Color3(0, .05, .1);
+    paddleMat.ambientColor = new Color3(1,1,1);
+    paddle.material = paddleMat;
     paddle.position = new Vector3(0, -1, 0);
+    
+    let bladeMat = new GradientMaterial('paddleMat', scene)
+    bladeMat.topColor = new Color3(1, 1, .3)
+    bladeMat.bottomColor = new Color3(1, .25, .1)
 
     leftBlade = MeshBuilder.CreateBox('leftBlade', {
-        width: .3,
+        width: .23,
         height: .55,
         depth: .01
     })
     leftBlade.position = paddle.position.add(new Vector3(0, .89, 0));
+    leftBlade.material = bladeMat.clone('leftBladeMat')
     paddle.addChild(leftBlade);
     
     
     rightBlade = MeshBuilder.CreateBox('rightBlade', {
-        width: .3,
+        width: .23,
         height: .55,
         depth: .01
     })
     rightBlade.position = paddle.position.add(new Vector3(0, -.89, 0));
+    rightBlade.material = bladeMat.clone('rightBladeMat')
     paddle.addChild(rightBlade)
     lefthand = MeshBuilder.CreateSphere('leftH', {
-        diameter: .15
+        diameter: .1
     })    
     var leftMat = new StandardMaterial('leftMat', scene);
     leftMat.diffuseColor = new Color3(.4, 0, 0.13);
@@ -78,13 +99,29 @@ const createPaddle = function(waterMesh: Mesh, scene: Scene) {
     lefthand.position = paddle.position.clone()
     // paddle.addChild(lefthand)
     righthand = MeshBuilder.CreateSphere('leftH', {
-        diameter: .15
+        diameter: .1
     })    
     var rightMat = new StandardMaterial('leftMat', scene);
     rightMat.diffuseColor = new Color3(.4, 0, .13);
     righthand.material = rightMat;
     righthand.position = paddle.position.clone()
-    // paddle.addChild(righthand)
+    
+    //Initialize the ducks before so that we are moving them around later
+    //rather than crating them anew every tie. Commonly used in shooters for bullets
+    for (var i =0; i<maxDucks; i++) {
+        let newLeftDuck = MeshBuilder.CreateSphere('lDuck'+i, {diameter:.03})
+        let newLMat = new StandardMaterial('lDuckMat' +i , scene);
+        newLMat.diffuseColor = new Color3(.3, 0, .05)
+        newLeftDuck.position = lefthand.position.clone()
+        newLeftDuck.material = newLMat
+        let newRightDuck = MeshBuilder.CreateSphere('rDuck'+i, {diameter:.03})
+        let newRMat = new StandardMaterial('rDuckMat' +i , scene);
+        newRMat.diffuseColor = new Color3(.3, 0, .05)
+        newRightDuck.position = righthand.position.clone()
+        newRightDuck.material = newRMat
+        leftDucks[i] = newLeftDuck;
+        rightDucks[i] = newRightDuck
+    }
     
 }
 const createVideoPillar = function(videoName: String,  pos: Vector3, scene: Scene, rotAmount: number, around: Vector3 = new Vector3(0,1,0)) {
@@ -391,9 +428,23 @@ const calibrateControllers = function() {
     let right: Vector3 = rightController.grip!.getAbsolutePosition().clone();//.scale(1/numIters);
     paddleCenter = Vector3.Center(left, right);
     if (stateManager.projectPaddle) {
+        resetCounter = 0;
         paddleCenter.addInPlace(forwardDir.scale(projectedScale));
         left.addInPlace(forwardDir.scale(projectedScale))
         right.addInPlace(forwardDir.scale(projectedScale))
+        if (counter > maxCounter) {
+            counter = 0;
+            leftDucks[nextDuckIdx].position = left.clone();
+            rightDucks[nextDuckIdx].position = right.clone();
+            nextDuckIdx = (nextDuckIdx+1) % maxDucks;
+        } else {
+            counter++;        
+        }
+    } else if (resetCounter < maxDucks) {
+        resetCounter++;
+        leftDucks[nextDuckIdx].position = new Vector3(0, -10, 0);
+        rightDucks[nextDuckIdx].position = new Vector3(0, -10, 0);
+        nextDuckIdx = (nextDuckIdx+1) % maxDucks; 
     }
     paddle.position = paddleCenter;
     var dx = paddleCenter.x - left.x;
@@ -409,5 +460,6 @@ const calibrateControllers = function() {
     }   
     lefthand.position = left
     righthand.position = right
+    
 }
 
