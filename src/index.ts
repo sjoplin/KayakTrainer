@@ -64,29 +64,32 @@ const createPaddle = function(waterMesh: Mesh, scene: Scene) {
     paddle.addChild(leftBlade);
     leftBlade.actionManager = new ActionManager(scene);
     leftBlade.actionManager.registerAction(
-        new SwitchBooleanAction(
+        new ExecuteCodeAction(
             {
                 trigger: ActionManager.OnIntersectionEnterTrigger, 
                 parameter: { 
                     mesh: waterMesh
                 }
             }, 
+            function() {
+                stateManager.leftIn = true;
+                stateManager.rightIn = false;
+            }
             
-            stateManager,
-            'leftIn'
         )
     );
     leftBlade.actionManager.registerAction(
-        new SwitchBooleanAction(
+        new ExecuteCodeAction(
             {
                 trigger: ActionManager.OnIntersectionExitTrigger, 
                 parameter: { 
                     mesh: waterMesh
                 }
             }, 
-            
-            stateManager,
-            'leftIn'
+            function() {
+                stateManager.leftIn = false;
+                stateManager.rightIn = false;
+            }
         )
     );
     
@@ -99,7 +102,7 @@ const createPaddle = function(waterMesh: Mesh, scene: Scene) {
     paddle.addChild(rightBlade)
     rightBlade.actionManager = new ActionManager(scene);
     rightBlade.actionManager?.registerAction(
-        new SwitchBooleanAction(
+        new ExecuteCodeAction(
             {
                 trigger: ActionManager.OnIntersectionEnterTrigger, 
                 parameter: { 
@@ -107,12 +110,14 @@ const createPaddle = function(waterMesh: Mesh, scene: Scene) {
                     usePreciseIntersection: true
                 }
             }, 
-            stateManager,
-            'rightIn'
+            function() {
+                stateManager.leftIn = false;
+                stateManager.rightIn = true;
+            }
         )
     );
     rightBlade.actionManager?.registerAction(
-        new SwitchBooleanAction(
+        new ExecuteCodeAction(
             {
                 trigger: ActionManager.OnIntersectionExitTrigger, 
                 parameter: { 
@@ -120,8 +125,10 @@ const createPaddle = function(waterMesh: Mesh, scene: Scene) {
                     usePreciseIntersection: true
                 }
             }, 
-            stateManager,
-            'rightIn'
+            function() {
+                stateManager.leftIn = false;
+                stateManager.rightIn = false;
+            }
         )
     );
 }
@@ -156,7 +163,7 @@ const createVideoPillar = function(videoName: String,  pos: Vector3, scene: Scen
     scene.onPointerObservable.add((pointerInfo) => {
         switch (pointerInfo.type) {
             case PointerEventTypes.POINTERDOWN:
-                console.log(playerCam.position.subtract(screen.position).length())
+                // console.log(playerCam.position.subtract(screen.position).length())
                 if (vTexture.video.paused && playerCam.position.subtract(screen.getAbsolutePosition()).length() < 5) {
                     vTexture.video.play();
                 } else {
@@ -202,47 +209,42 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                 if (playerCam != undefined) {
                     let hips: Vector3 = (scene.activeCamera as WebXRCamera).position.clone()
                     hips.y = 0
-                    if (stateManager.leftIn) {
+                    if (leftBlade.getAbsolutePosition().y < .6) {
                         delay++;
                         let contactPoint: Vector3 = leftBlade.getAbsolutePosition().clone();
                         contactPoint.y = 0;
                         let contactVec: Vector3 = hips.subtract(contactPoint);
                 
                         if (delay > 10) {
-                            leftController.motionController?.pulse(1,1);
-                            console.log('haptics on left controller');
-                            let leftVel = contactPoint.subtract(prevLeft);
-                            let ratio = Math.min(contactVec.length()/.95, 1);
-                            let dot = Vector3.Dot(leftVel, forwardDir)
                             
-                            if (dot < 0) {
-                                rotAcc += Math.abs(leftVel.scale(ratio).length()) / 1.5;
-                            } else {
-                                rotAcc -= Math.abs(leftVel.scale(ratio).length()) / 1.5 ;
-                            }
+                            // console.log('haptics on left controller');
+                            let leftVel = contactPoint.subtract(prevLeft);
+                            console.log(leftVel);
+                            leftController.motionController?.pulse(leftVel.length()*20,.1);
+                            // let horizontal = Vector3.Dot(leftVel, Vector3.Cross(Vector3.Up(), forwardDir))
+                            let ratio = Math.min(contactVec.length()/.95, 1);
+                            let dot = Vector3.Dot(leftVel.scale(ratio), forwardDir)
+                            rotAcc -= dot;
+                            
                             leftVel.scaleInPlace(1-ratio);
                             let change = forwardDir.scale(Vector3.Dot(leftVel, forwardDir));
                             playerAcceleration.addInPlace(change.negate());
                         }
                         
-                    } else if (stateManager.rightIn) {
+                    } else if (rightBlade.getAbsolutePosition().y < .6) {
                         delay++;
-                        
                         let contactPoint: Vector3 = rightBlade.getAbsolutePosition().clone();
                         contactPoint.y = 0;
                         let contactVec: Vector3 = hips.subtract(contactPoint);
                         if (delay > 10) {
-                            rightController.motionController?.pulse(1,1);
-                            console.log('haptics on right controller');
+                            // // rightController.motionController?.pulse(.1,1);
+                            // console.log('haptics on right controller');
                             let rightVel = contactPoint.subtract(prevRight);
+                            rightController.motionController?.pulse(rightVel.length()*20,.1);
                             let ratio = Math.min(contactVec.length()/.95, 1);
-                            let dot = Vector3.Dot(rightVel, forwardDir);
-                            if (dot < 0) {
-                                rotAcc -= Math.abs(rightVel.scale(ratio).length()) / 1.5;
-                            } else {
-                                rotAcc += Math.abs(rightVel.scale(ratio).length()) / 1.5 ;
-                            }
-                             
+                            let dot = Vector3.Dot(rightVel.scale(ratio), forwardDir);
+                            
+                            rotAcc += dot;
                             rightVel.scaleInPlace(1-ratio);
                             let change = forwardDir.scale(Vector3.Dot(rightVel, forwardDir));
                             playerAcceleration.addInPlace(change.negate());
@@ -254,15 +256,24 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                     
                 }
                 
-                console.log(forwardDir);
+                // console.log(forwardDir);
                 rotAcc*=.98
-                playerAcceleration.scaleInPlace(.995);
+                // console.log('Rotation Acceleration:' + rotAcc)
+                //Capping the movement speed
+                if (rotAcc > 0) {
+                    rotAcc = Math.min(rotAcc, 1)
+                } else {
+                    rotAcc = Math.max(rotAcc, -1)
+                }
+                if (playerAcceleration.length() > 2) {
+                    playerAcceleration.scaleInPlace(2/playerAcceleration.length());
+                } else {
+                    playerAcceleration.scaleInPlace(.995);
+                }
                 prevLeft = leftBlade.getAbsolutePosition().clone();
                 prevLeft.y = 0;
                 prevRight = rightBlade.getAbsolutePosition().clone();
                 prevRight.y = 0;
-                leftIdx = (leftIdx+1)%10;
-                rightIdx = (rightIdx+1)%10;
             }
         )
     );
@@ -309,7 +320,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
         height: 512,
         subdivisions: 32,
      }, scene);
-    waterMesh.position.y = 0.5;
+    waterMesh.position.y = 0.45;
     var water = new WaterMaterial("water", scene, new Vector2(512, 512));
     water.backFaceCulling = true;
     water.bumpTexture = new Texture("src/textures/waterbump.png", scene);
@@ -332,7 +343,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     const availableFeatures = WebXRFeaturesManager.GetAvailableFeatures();
 
     createVideoPillar('forward', new Vector3(0, 1, 3), scene, Math.PI/4);
-    createVideoPillar('sweep', new Vector3(0, 1, 20), scene, 0)
+    createVideoPillar('sweep', new Vector3(0, 1, 12), scene, 0)
     createPaddle(waterMesh, scene);
     
     
@@ -343,9 +354,15 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                     let fps = engine.getFps()
                     let rotQuat = Quaternion.RotationAxis(Vector3.Up(), rotAcc/fps);
                     (scene.activeCamera as WebXRCamera).rotationQuaternion.multiplyInPlace(rotQuat);
-                    forwardDir = forwardDir.rotateByQuaternionAroundPointToRef(rotQuat,playerCam.position, forwardDir);
-                    forwardDir.normalize();
                     
+                    // forwardDir = forwardDir.rotateByQuaternionAroundPointToRef(rotQuat,playerCam.position, forwardDir);
+                    let temp1: Vector3 = paddleCenter.clone()
+                    let temp2: Vector3 = playerCam.position.clone()
+                    temp1.y = 0;
+                    temp2.y = 0;
+                    forwardDir = temp1.subtract(temp2)
+                    forwardDir.normalize();
+                    // console.log(forwardDir);
                     playerCam.position.addInPlace(playerAcceleration.scale(1/fps));
                 });
                 break;
@@ -354,7 +371,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
 
     xrHelper.input.onControllerAddedObservable.add((xrController)=> {
         xrController.onMotionControllerInitObservable.add((motionController)=>{
-            console.log(motionController)
+            // console.log(motionController)
             if (motionController.handness == 'left') {
                 leftController = xrController;
             } else {
