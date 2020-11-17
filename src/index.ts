@@ -19,6 +19,7 @@ import { ActionManager } from "@babylonjs/core/Actions/actionManager";
 import { ExecuteCodeAction } from "@babylonjs/core/Actions";
 import * as GUI from 'babylonjs-gui';
 import { GradientMaterial } from "@babylonjs/materials";
+import { AssetsManager } from "@babylonjs/core";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement; // Get the canvas element 
 const engine = new Engine(canvas, true); // Generate the BABYLON 3D engine
@@ -301,7 +302,7 @@ const createVideoPillar = function(videoName: String,  pos: Vector3, scene: Scen
         depth: 2
     }, scene)
     var pillarMaterial = new StandardMaterial(videoName + 'pillar', scene)
-    pillarMaterial.diffuseColor = new Color3(0,0,0);
+    pillarMaterial.diffuseColor = new Color3(0.5,0.5,0.5);
     pillar.material = pillarMaterial;
     pillar.position = pos.clone();
     
@@ -337,6 +338,29 @@ const createVideoPillar = function(videoName: String,  pos: Vector3, scene: Scen
             break
         }
     })
+}
+/**
+ * Create pillars to fill the scene
+ * @param size The size of the pillar (width, height, depth)
+ * @param pos the offsett from around
+ * @param scene scene to render on
+ * @param rotAmount how much to rotate around "around"
+ * @param around The point to rotate aroud
+ * @param color the color of the pillar
+ * @returns Mesh of the pillar
+ */
+const createPillar = function(size: Vector3, pos: Vector3, scene: Scene, rotAmount: number, around: Vector3, color: Color3): Mesh {
+    let pillar = MeshBuilder.CreateBox('pillar' + pos, {
+        width: size.x,
+        height: size.y,
+        depth: size.z
+    })
+    pillar.position = pos;
+    pillar.rotateAround(around, new Vector3(0,1,0), rotAmount)
+    let pMat = new StandardMaterial('pMat' + pos, scene);
+    pMat.diffuseColor = color
+    pillar.material = pMat
+    return pillar
 }
 
 /**
@@ -425,14 +449,25 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     water.addToRenderList(skybox);
     water.addToRenderList(ground);
     waterMesh.material = water;
+     for(var i =0; i < 12; i++) {
+        createPillar(new Vector3(Math.random() + 1, Math.random()*20+2, Math.random()*2+2), new Vector3(0, 1, Math.random()*30+20), scene, -Math.PI/6 * i, new Vector3(0,1,0), new Color3(0.6, 1, 1))
+     }
+    const aManager: AssetsManager = new AssetsManager(scene);
+    const libertyTask = aManager.addMeshTask('CreateLiberty', 'LibertyStatue', 'src/models', 'LibertStatue.obj')
+    libertyTask.onSuccess = (task) => {
+        console.log(task)
+        const mesh = task.loadedMeshes[0]
+        mesh.position = new Vector3(12, 3, 20)
+    }
     const xrHelper: WebXRDefaultExperience = await scene.createDefaultXRExperienceAsync({
         floorMeshes: [waterMesh]
     });
+    
     playerCam = xrHelper.input.xrCamera;
     //Disabling Teleportation
     xrHelper.teleportation.detach();
-    xrHelper.pointerSelection.displayLaserPointer = false
-    xrHelper.pointerSelection.displaySelectionMesh = false
+    xrHelper.pointerSelection.displayLaserPointer = false;
+    xrHelper.pointerSelection.displaySelectionMesh = false;
     const availableFeatures = WebXRFeaturesManager.GetAvailableFeatures();
 
     //Create the forward video near spawn
