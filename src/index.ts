@@ -41,6 +41,7 @@ let playerAcceleration: Vector3 = new Vector3(0,0,0);
 let rotAcc: number = 0;
 let playerCam: WebXRCamera;
 let forwardDir: Vector3 = new Vector3(0,0,1);
+let instructionsVisible: boolean;
 
 //StateManager
 var stateManager = {
@@ -295,7 +296,7 @@ const createPaddle = function(scene: Scene) {
  * @param rotAmount How much should we rotate around the origin
  * @param around what point should we rotate around. Default is (0,1,0)
  */
-const createVideoPillar = function(videoName: String,  pos: Vector3, scene: Scene, rotAmount: number, around: Vector3 = new Vector3(0,1,0)) {
+const createVideoPillar = function(xrHelper: WebXRDefaultExperience, videoName: String,  pos: Vector3, scene: Scene, rotAmount: number, around: Vector3 = new Vector3(0,1,0)) {
     var pillar = MeshBuilder.CreateBox('pillar' + videoName, {
         width: 1.5,
         height: 7,
@@ -325,15 +326,18 @@ const createVideoPillar = function(videoName: String,  pos: Vector3, scene: Scen
     
 
     scene.onPointerObservable.add((pointerInfo) => {
-        
+        const pointerEvent:PointerEvent = pointerInfo.event as PointerEvent;
+        const inputSource = xrHelper.pointerSelection.getXRControllerByPointerId(pointerEvent.pointerId);
         switch (pointerInfo.type) {
             case PointerEventTypes.POINTERDOWN:
                 console.log('Pressed')
-                // console.log(playerCam.position.subtract(screen.position).length())
-                if (vTexture.video.paused && playerCam.position.subtract(screen.getAbsolutePosition()).length() < 5) {
-                    vTexture.video.play();
-                } else {
-                    vTexture.video.pause();
+                if (inputSource?.motionController?.handness == "left") {
+                    // console.log(playerCam.position.subtract(screen.position).length())
+                    if (vTexture.video.paused && playerCam.position.subtract(screen.getAbsolutePosition()).length() < 5) {
+                        vTexture.video.play();
+                    } else {
+                        vTexture.video.pause();
+                    }
                 }
             break
         }
@@ -380,7 +384,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     infoUi.position.z = 2;
     
     var infoText = new GUI.TextBlock();
-    infoText.text = "Controls \nTrigger button: start/pause video \nAction/Squeeze button: calibrate paddles";
+    infoText.text = "Controls \nLeft Trigger button: start/pause video \nRight Trigger button: show/hide instructions \nAction/Squeeze button: calibrate paddles";
     infoText.resizeToFit = true;
     infoText.color = "white";
     infoText.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
@@ -389,7 +393,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     var infoTexture = GUI.AdvancedDynamicTexture.CreateForMesh(infoUi, 1024, 1024);
     infoTexture.addControl(infoText);
     
-    infoUi.rotateAround(new Vector3(0, 1, 0), new Vector3(0, 1, 0), Math.PI/4)
+    // infoUi.rotateAround(new Vector3(0, 1, 0), new Vector3(0, 1, 0), Math.PI/4);
     
     //run every frame. Our main logic for accelerating
     scene.actionManager.registerAction(
@@ -471,11 +475,35 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     const availableFeatures = WebXRFeaturesManager.GetAvailableFeatures();
 
     //Create the forward video near spawn
-    createVideoPillar('forward', new Vector3(0, 1, 3), scene, Math.PI/4);
+    createVideoPillar(xrHelper, 'forward', new Vector3(0, 1, 3), scene, Math.PI/4);
     // Create the sweep video directly in fron of user
-    createVideoPillar('sweep', new Vector3(0, 1, 12), scene, 0)
+    createVideoPillar(xrHelper, 'sweep', new Vector3(0, 1, 12), scene, 0);
     // Initialize the paddle
     createPaddle(scene);
+
+    scene.onPointerObservable.add((pointerInfo) => {
+        const pointerEvent:PointerEvent = pointerInfo.event as PointerEvent;
+        const inputSource = xrHelper.pointerSelection.getXRControllerByPointerId(pointerEvent.pointerId);
+        switch (pointerInfo.type) {
+            case PointerEventTypes.POINTERDOWN:
+                console.log('Pressed')
+                if (inputSource?.motionController?.handness == "right") {
+                    // show/hide instructions
+                    // infoUi
+                    if (instructionsVisible) {
+                        instructionsVisible = false;
+                        infoUi.visibility = 0;
+                    } else {
+                        infoUi.visibility = 1;
+                        let playerCamPosition: Vector3 = (playerCam as WebXRCamera).position.clone()
+                        infoUi.position = playerCamPosition;
+                        infoUi.position.addInPlace(forwardDir.scale(2));
+                        instructionsVisible = true;
+                    }
+                }
+            break
+        }
+    })
     
     // We only want to move the camera right before the frame is rendered to
     // avoid potential issues
