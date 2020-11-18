@@ -527,40 +527,46 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                     let fps = engine.getFps()
                     //rotate the users camera
                     let rotQuat = Quaternion.RotationAxis(Vector3.Up(), rotAcc/fps);
-                    (scene.activeCamera as WebXRCamera).rotationQuaternion.multiplyInPlace(rotQuat);
-                    if (stateManager.instructionsVisible) {
-                        infoUi.visibility = 1;
-                        let playerCamPosition: Vector3 = (playerCam as WebXRCamera).position
-                        infoUi.position = playerCamPosition.clone();
-                        infoUi.position.addInPlace(forwardDir.scale(2));
-                        infoUi.rotation.y = Math.atan2(infoUi.position.x - playerCamPosition.x ,  infoUi.position.z - playerCamPosition.z)
-                    } else {
-                        infoUi.visibility = 0;
-                    }
-                    console.log(statistics)
-                    // We have to do forward direction this way. For some reason the forward Dir
-                    // Drifts if we rotate it as we rotate the camera above
-                    let temp1: Vector3 = paddleCenter.clone()
-                    let temp2: Vector3 = playerCam.position.clone()
-                    temp1.y = 0;
-                    temp2.y = 0;
-                    forwardDir = temp1.subtract(temp2)
-                    forwardDir.normalize();
-                    //Add the velocity
-                    playerCam.position.addInPlace(playerAcceleration.scale(1/fps));
-                    screens.forEach(screen => {
-                        if (playerCam.position.subtract(screen.getAbsolutePosition()).length() < 4.5) {
-                            screen.visibility = 1
+                    if ((scene.activeCamera as WebXRCamera).rotationQuaternion !== undefined) {
+                        (scene.activeCamera as WebXRCamera).rotationQuaternion.multiplyInPlace(rotQuat);
+                        if (stateManager.instructionsVisible) {
+                            infoUi.visibility = 1;
+                            let playerCamPosition: Vector3 = (playerCam as WebXRCamera).position
+                            infoUi.position = playerCamPosition.clone();
+                            infoUi.position.addInPlace(forwardDir.scale(2));
+                            infoUi.rotation.y = Math.atan2(infoUi.position.x - playerCamPosition.x ,  infoUi.position.z - playerCamPosition.z)
                         } else {
-                            screen.visibility = 0
+                            infoUi.visibility = 0;
                         }
-                    })
+                        
+                        // We have to do forward direction this way. For some reason the forward Dir
+                        // Drifts if we rotate it as we rotate the camera above
+                        let temp1: Vector3 = paddleCenter.clone()
+                        let temp2: Vector3 = playerCam.position.clone()
+                        temp1.y = 0;
+                        temp2.y = 0;
+                        forwardDir = temp1.subtract(temp2)
+                        forwardDir.normalize();
+                        //Add the velocity
+                        playerCam.position.addInPlace(playerAcceleration.scale(1/fps));
+                        screens.forEach(screen => {
+                            if (playerCam.position.subtract(screen.getAbsolutePosition()).length() < 4.5) {
+                                screen.visibility = 1
+                            } else {
+                                screen.visibility = 0
+                            }
+                        })
+                    }
                 });
                 break;
         }
     })
     // Register the controllers once they are added
     xrHelper.input.onControllerAddedObservable.add((xrController)=> {
+        
+         
+         
+        
         xrController.onMotionControllerInitObservable.add((motionController)=>{
             // Store the controllers globally
             if (motionController.handness == 'left') {
@@ -599,13 +605,19 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
         
         });
     })
-    // Stop doing everything
-    // xrHelper.input.onControllerRemovedObservable.add((xrController)=>{
-    //     stateManager.controllersReady = false;
-    //     paddle.position = new Vector3(0, -10, 0);
-    //     lefthand.position = new Vector3(0, -10, 0);
-    //     righthand.position = new Vector3(0, -10, 0);
-    // })
+    xrHelper.input.onControllerRemovedObservable.add((controller)=> {
+        console.log('leaving')
+        stateManager.controllersReady = false;
+        stateManager.instructionsVisible = true;
+        stateManager.projectPaddle = false;
+        playerAcceleration = new Vector3(0,0,0)
+        rotAcc = 0
+        paddle.position = new Vector3(0, -10, 0);
+        lefthand.position = new Vector3(0, -10, 0)
+        righthand.position = new Vector3(0,-10, 0)
+
+    })
+    
     return scene;
 }
 
