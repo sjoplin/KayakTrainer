@@ -21,6 +21,7 @@ import * as GUI from 'babylonjs-gui';
 import { GradientMaterial } from "@babylonjs/materials";
 
 import { particlesPixelShader } from "@babylonjs/core/Shaders/particles.fragment";
+import { TextBlock } from "babylonjs-gui";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement; // Get the canvas element 
 const engine = new Engine(canvas, true); // Generate the BABYLON 3D engine
@@ -47,7 +48,7 @@ let forwardDir: Vector3 = new Vector3(0,0,1);
 var stateManager = {
     controllersReady: false,
     projectPaddle: false,
-    instructionsVisible: true
+    instructionsVisible: 0
 }
 //variables for Ducklings
 let maxDucks = 15;
@@ -65,6 +66,8 @@ let statistics = {
     paddleSpeed: 0,
     paddleAngle: 0 
 }
+
+let infoText: TextBlock;
 
 /**
  * This is what sets the paddles position to the hand controllers
@@ -409,8 +412,8 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     infoUi.position.y = 1.5;
     infoUi.position.z = 2;
     
-    var infoText = new GUI.TextBlock();
-    infoText.text = "Controls \nLeft Trigger button: start/pause video \nRight Trigger button: show/hide instructions \nAction/Squeeze button: calibrate paddles\nAction/Squeeze button again: Project Paddle";
+    infoText = new GUI.TextBlock();
+    infoText.text = "Controls \nLeft Trigger button: start/pause video \nRight Trigger button: Toggle between Instructions/Statistics \nAction/Squeeze button: calibrate paddles\nAction/Squeeze button again: Project Paddle";
     infoText.resizeToFit = true;
     infoText.color = "white";
     infoText.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
@@ -508,12 +511,16 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
             case PointerEventTypes.POINTERDOWN:
                 
                 if (inputSource?.motionController?.handness == "right") {
-                    // show/hide instructions
-                    // infoUi
-                    stateManager.instructionsVisible = !stateManager.instructionsVisible
-                    
+                    // cycle ui content
+                    stateManager.instructionsVisible = (stateManager.instructionsVisible + 1) % 3;
                 }
             break
+        }
+        if (stateManager.instructionsVisible == 1) {
+            infoText.text = "Player Speed: " + statistics.playerSpeed +
+                "\nPlayer Angular Speed: " + statistics.playerAngularSpeed +
+                "\nPaddle Speed (in water): " + statistics.paddleSpeed +
+                "\nPaddle Angle (in water): " + statistics.paddleAngle;
         }
     })
     
@@ -528,7 +535,14 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                     //rotate the users camera
                     let rotQuat = Quaternion.RotationAxis(Vector3.Up(), rotAcc/fps);
                     (scene.activeCamera as WebXRCamera).rotationQuaternion.multiplyInPlace(rotQuat);
-                    if (stateManager.instructionsVisible) {
+                    if (stateManager.instructionsVisible == 0) {
+                        infoUi.visibility = 1;
+                        let playerCamPosition: Vector3 = (playerCam as WebXRCamera).position
+                        infoUi.position = playerCamPosition.clone();
+                        infoUi.position.addInPlace(forwardDir.scale(2));
+                        infoUi.rotation.y = Math.atan2(infoUi.position.x - playerCamPosition.x ,  infoUi.position.z - playerCamPosition.z)
+                        infoText.text = "Controls \nLeft Trigger button: start/pause video \nRight Trigger button: Toggle between Instructions/Statistics \nAction/Squeeze button: calibrate paddles\nAction/Squeeze button again: Project Paddle";
+                    } else if (stateManager.instructionsVisible == 1) {
                         infoUi.visibility = 1;
                         let playerCamPosition: Vector3 = (playerCam as WebXRCamera).position
                         infoUi.position = playerCamPosition.clone();
