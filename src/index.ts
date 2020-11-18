@@ -42,12 +42,12 @@ let playerAcceleration: Vector3 = new Vector3(0,0,0);
 let rotAcc: number = 0;
 let playerCam: WebXRCamera;
 let forwardDir: Vector3 = new Vector3(0,0,1);
-let instructionsVisible: boolean;
 
 //StateManager
 var stateManager = {
     controllersReady: false,
-    projectPaddle: false
+    projectPaddle: false,
+    instructionsVisible: true
 }
 //variables for Ducklings
 let maxDucks = 15;
@@ -396,7 +396,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     infoUi.position.z = 2;
     
     var infoText = new GUI.TextBlock();
-    infoText.text = "Controls \nLeft Trigger button: start/pause video \nRight Trigger button: show/hide instructions \nAction/Squeeze button: calibrate paddles";
+    infoText.text = "Controls \nLeft Trigger button: start/pause video \nRight Trigger button: show/hide instructions \nAction/Squeeze button: calibrate paddles\nAction/Squeeze button again: Project Paddle";
     infoText.resizeToFit = true;
     infoText.color = "white";
     infoText.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
@@ -502,16 +502,8 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                 if (inputSource?.motionController?.handness == "right") {
                     // show/hide instructions
                     // infoUi
-                    if (instructionsVisible) {
-                        instructionsVisible = false;
-                        infoUi.visibility = 0;
-                    } else {
-                        infoUi.visibility = 1;
-                        let playerCamPosition: Vector3 = (playerCam as WebXRCamera).position.clone()
-                        infoUi.position = playerCamPosition;
-                        infoUi.position.addInPlace(forwardDir.scale(2));
-                        instructionsVisible = true;
-                    }
+                    stateManager.instructionsVisible = !stateManager.instructionsVisible
+                    
                 }
             break
         }
@@ -528,7 +520,15 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                     //rotate the users camera
                     let rotQuat = Quaternion.RotationAxis(Vector3.Up(), rotAcc/fps);
                     (scene.activeCamera as WebXRCamera).rotationQuaternion.multiplyInPlace(rotQuat);
-                    
+                    if (stateManager.instructionsVisible) {
+                        infoUi.visibility = 1;
+                        let playerCamPosition: Vector3 = (playerCam as WebXRCamera).position.clone()
+                        infoUi.position = playerCamPosition;
+                        infoUi.position.addInPlace(forwardDir.scale(2));
+                        infoUi.rotation.y = Math.atan2(infoUi.position.x, infoUi.position.z)
+                    } else {
+                        infoUi.visibility = 0;
+                    }
                     // We have to do forward direction this way. For some reason the forward Dir
                     // Drifts if we rotate it as we rotate the camera above
                     let temp1: Vector3 = paddleCenter.clone()
@@ -540,7 +540,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                     //Add the velocity
                     playerCam.position.addInPlace(playerAcceleration.scale(1/fps));
                     screens.forEach(screen => {
-                        if (playerCam.position.subtract(screen.getAbsolutePosition()).length() < 5) {
+                        if (playerCam.position.subtract(screen.getAbsolutePosition()).length() < 4.5) {
                             screen.visibility = 1
                         } else {
                             screen.visibility = 0
