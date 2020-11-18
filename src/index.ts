@@ -147,7 +147,7 @@ const updateSpeeds = function() {
                     // Velocity of the paddle blade
                     let leftVel = contactPoint.subtract(prevLeft);
                     statistics.paddleAngle = paddle.rotation.z;
-                    statistics.paddleSpeed = leftVel.length()
+                    statistics.paddleSpeed = leftVel.length() * engine.getFps()
                     //Vibrate the controller based on speed
                     leftController.motionController!.pulse(Math.min(leftVel.length()*20, 1), 1);
                     // The further away the paddle is the more rotation there should be
@@ -177,7 +177,7 @@ const updateSpeeds = function() {
                     //Get paddle blade velocity
                     let rightVel = contactPoint.subtract(prevRight);
                     statistics.paddleAngle = paddle.rotation.z;
-                    statistics.paddleSpeed = rightVel.length()
+                    statistics.paddleSpeed = rightVel.length() * engine.getFps()
                     //Virbate the controller based on speed
                     rightController.motionController!.pulse(Math.min(rightVel.length()*20, 1), 1);
                     // Change velcoity into angular vel depending on how far away
@@ -537,6 +537,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                     } else {
                         infoUi.visibility = 0;
                     }
+                    console.log(statistics)
                     // We have to do forward direction this way. For some reason the forward Dir
                     // Drifts if we rotate it as we rotate the camera above
                     let temp1: Vector3 = paddleCenter.clone()
