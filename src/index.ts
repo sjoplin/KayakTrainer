@@ -19,7 +19,7 @@ import { ActionManager } from "@babylonjs/core/Actions/actionManager";
 import { ExecuteCodeAction } from "@babylonjs/core/Actions";
 import * as GUI from 'babylonjs-gui';
 import { GradientMaterial } from "@babylonjs/materials";
-import { AssetsManager } from "@babylonjs/core";
+
 import { particlesPixelShader } from "@babylonjs/core/Shaders/particles.fragment";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement; // Get the canvas element 
@@ -468,13 +468,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
      for(var i =0; i < 12; i++) {
         createPillar(new Vector3(Math.random() + 1, Math.random()*20+2, Math.random()*2+2), new Vector3(0, 1, Math.random()*30+20), scene, -Math.PI/6 * i, new Vector3(0,1,0), new Color3(0.6, 1, 1))
      }
-    const aManager: AssetsManager = new AssetsManager(scene);
-    const libertyTask = aManager.addMeshTask('CreateLiberty', 'LibertyStatue', 'src/models', 'LibertStatue.obj')
-    libertyTask.onSuccess = (task) => {
-        console.log(task)
-        const mesh = task.loadedMeshes[0]
-        mesh.position = new Vector3(12, 3, 20)
-    }
+    
     const xrHelper: WebXRDefaultExperience = await scene.createDefaultXRExperienceAsync({
         floorMeshes: [waterMesh]
     });
@@ -522,10 +516,10 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                     (scene.activeCamera as WebXRCamera).rotationQuaternion.multiplyInPlace(rotQuat);
                     if (stateManager.instructionsVisible) {
                         infoUi.visibility = 1;
-                        let playerCamPosition: Vector3 = (playerCam as WebXRCamera).position.clone()
-                        infoUi.position = playerCamPosition;
+                        let playerCamPosition: Vector3 = (playerCam as WebXRCamera).position
+                        infoUi.position = playerCamPosition.clone();
                         infoUi.position.addInPlace(forwardDir.scale(2));
-                        infoUi.rotation.y = Math.atan2(infoUi.position.x, infoUi.position.z)
+                        infoUi.rotation.y = Math.atan2(infoUi.position.x - playerCamPosition.x ,  infoUi.position.z - playerCamPosition.z)
                     } else {
                         infoUi.visibility = 0;
                     }
