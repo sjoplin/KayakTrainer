@@ -20,10 +20,11 @@ import { ExecuteCodeAction } from "@babylonjs/core/Actions";
 import * as GUI from 'babylonjs-gui';
 import { GradientMaterial } from "@babylonjs/materials";
 import { AssetsManager } from "@babylonjs/core";
+import { particlesPixelShader } from "@babylonjs/core/Shaders/particles.fragment";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement; // Get the canvas element 
 const engine = new Engine(canvas, true); // Generate the BABYLON 3D engine
-
+const screens: Mesh[] = new Array();
 // Paddle Related things
 let paddleCenter: Vector3 = new Vector3(0, 3, 3);
 let leftController: WebXRInputSource;
@@ -308,10 +309,21 @@ const createVideoPillar = function(xrHelper: WebXRDefaultExperience, videoName: 
     pillar.position = pos.clone();
     
     var screen = Mesh.CreatePlane(videoName + 'Screen', 1, scene)
+    var hScreen = Mesh.CreatePlane(videoName + 'highlight', 1.1, scene)    
+    
     screen.position = pos.clone();
     screen.position.y = 1.1
-    screen.position.z -= 1.001
+    screen.position.z -= 1.01
+    hScreen.position = screen.position.clone()
+    hScreen.position.z += .005
+    var hMat = new StandardMaterial('', scene)
+    hMat.diffuseColor = new Color3(1,1,.6)
+    hMat.emissiveColor = new Color3(1,1,.6)
+    hScreen.material = hMat 
+    screens.push(hScreen)
+    pillar.addChild(hScreen)
     pillar.addChild(screen)
+
     pillar.rotateAround(new Vector3(0, 1, 0), around, rotAmount)
 
     var vTexture = new VideoTexture(videoName + '', 'src/videos/' + videoName + '.mp4', scene);
@@ -486,7 +498,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
         const inputSource = xrHelper.pointerSelection.getXRControllerByPointerId(pointerEvent.pointerId);
         switch (pointerInfo.type) {
             case PointerEventTypes.POINTERDOWN:
-                console.log('Pressed')
+                
                 if (inputSource?.motionController?.handness == "right") {
                     // show/hide instructions
                     // infoUi
@@ -527,6 +539,13 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
                     forwardDir.normalize();
                     //Add the velocity
                     playerCam.position.addInPlace(playerAcceleration.scale(1/fps));
+                    screens.forEach(screen => {
+                        if (playerCam.position.subtract(screen.getAbsolutePosition()).length() < 5) {
+                            screen.visibility = 1
+                        } else {
+                            screen.visibility = 0
+                        }
+                    })
                 });
                 break;
         }
@@ -572,12 +591,12 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
         });
     })
     // Stop doing everything
-    xrHelper.input.onControllerRemovedObservable.add((xrController)=>{
-        stateManager.controllersReady = false;
-        paddle.position = new Vector3(0, -10, 0);
-        lefthand.position = new Vector3(0, -10, 0);
-        righthand.position = new Vector3(0, -10, 0);
-    })
+    // xrHelper.input.onControllerRemovedObservable.add((xrController)=>{
+    //     stateManager.controllersReady = false;
+    //     paddle.position = new Vector3(0, -10, 0);
+    //     lefthand.position = new Vector3(0, -10, 0);
+    //     righthand.position = new Vector3(0, -10, 0);
+    // })
     return scene;
 }
 
