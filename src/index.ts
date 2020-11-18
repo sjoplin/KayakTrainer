@@ -57,8 +57,14 @@ let nextDuckIdx = 0;
 let counter = 0;
 let maxCounter = 1;
 let resetCounter = 0;
-
 let paddle: Mesh;
+
+let statistics = {
+    playerSpeed: 0,
+    playerAngularSpeed: 0,
+    paddleSpeed: 0,
+    paddleAngle: 0 
+}
 
 /**
  * This is what sets the paddles position to the hand controllers
@@ -128,6 +134,7 @@ const updateSpeeds = function() {
             }
             // Tried doing collision detection became buggy after being in scene too long
             if (leftBlade.getAbsolutePosition().y < .6) {
+                
                 // dont want to start immediately
                 delay++;
                 // Where are we currently
@@ -139,6 +146,8 @@ const updateSpeeds = function() {
                 if (delay > 5) {
                     // Velocity of the paddle blade
                     let leftVel = contactPoint.subtract(prevLeft);
+                    statistics.paddleAngle = paddle.rotation.z;
+                    statistics.paddleSpeed = leftVel.length()
                     //Vibrate the controller based on speed
                     leftController.motionController!.pulse(Math.min(leftVel.length()*20, 1), 1);
                     // The further away the paddle is the more rotation there should be
@@ -167,6 +176,8 @@ const updateSpeeds = function() {
                 if (delay > 5) {
                     //Get paddle blade velocity
                     let rightVel = contactPoint.subtract(prevRight);
+                    statistics.paddleAngle = paddle.rotation.z;
+                    statistics.paddleSpeed = rightVel.length()
                     //Virbate the controller based on speed
                     rightController.motionController!.pulse(Math.min(rightVel.length()*20, 1), 1);
                     // Change velcoity into angular vel depending on how far away
@@ -189,7 +200,8 @@ const updateSpeeds = function() {
             } else {
                 // with none in the water, reset delay
                 delay = 0;
-                
+                statistics.paddleSpeed = 0
+                statistics.paddleAngle = 0
             }
             
         }
@@ -211,6 +223,8 @@ const updateSpeeds = function() {
             // linearly decrease speed
             playerAcceleration.scaleInPlace(.995);
         }
+        statistics.playerSpeed = playerAcceleration.length()
+        statistics.playerAngularSpeed = Math.abs(rotAcc);
         //keep track of paddle position
         prevLeft = leftBlade.getAbsolutePosition().clone();
         prevLeft.y = 0;
