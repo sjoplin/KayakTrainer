@@ -312,7 +312,7 @@ const createVideoPillar = function(xrHelper: WebXRDefaultExperience, videoName: 
     var hScreen = Mesh.CreatePlane(videoName + 'highlight', 1.1, scene)    
     
     screen.position = pos.clone();
-    screen.position.y = 1.1
+    screen.position.y = 1.4
     screen.position.z -= 1.01
     hScreen.position = screen.position.clone()
     hScreen.position.z += .005
@@ -451,14 +451,14 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
         height: 512,
         subdivisions: 32,
      }, scene);
-    waterMesh.position.y = 0.45;
+    waterMesh.position.y = 0.35;
     var water = new WaterMaterial("water", scene, new Vector2(512, 512));
     water.backFaceCulling = true;
     water.bumpTexture = new Texture("src/textures/waterbump.png", scene);
-    water.windForce = 0;
+    water.windForce = 2;
     
-    water.waveHeight = 0;
-    water.bumpHeight = 0;
+    water.waveHeight = .05;
+    water.bumpHeight = .05;
     water.waterColor = new Color3(0.047, 0.23, 0.015);
     water.waterColor2 = new Color3(0, .3, .3);
     water.colorBlendFactor = 0.5;
