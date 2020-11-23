@@ -17,11 +17,8 @@ import { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperienc
 import { WebXRCamera, WebXRControllerComponent, WebXRInputSource, WebXRState} from "@babylonjs/core/XR";
 import { ActionManager } from "@babylonjs/core/Actions/actionManager";
 import { ExecuteCodeAction } from "@babylonjs/core/Actions";
-import * as GUI from 'babylonjs-gui';
 import { GradientMaterial } from "@babylonjs/materials";
-
-import { particlesPixelShader } from "@babylonjs/core/Shaders/particles.fragment";
-import { TextBlock } from "babylonjs-gui";
+import { TextBlock, AdvancedDynamicTexture, Control } from "babylonjs-gui";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement; // Get the canvas element 
 const engine = new Engine(canvas, true); // Generate the BABYLON 3D engine
@@ -343,7 +340,7 @@ const createVideoPillar = function(xrHelper: WebXRDefaultExperience, videoName: 
 
     pillar.rotateAround(new Vector3(0, 1, 0), around, rotAmount)
 
-    var vTexture = new VideoTexture(videoName + '', 'src/videos/' + videoName + '.mp4', scene);
+    var vTexture = new VideoTexture(videoName + '', './js/videos/' + videoName + '.mp4', scene);
     vTexture.video.autoplay=false;
     var vMat = new StandardMaterial('FMat', scene);
     vMat.emissiveColor = new Color3(1,1,1);
@@ -412,14 +409,14 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     infoUi.position.y = 1.5;
     infoUi.position.z = 2;
     
-    infoText = new GUI.TextBlock();
+    infoText = new TextBlock();
     infoText.text = "Controls \nLeft Trigger button: start/pause video \nRight Trigger button: Toggle between Instructions/Statistics \nAction/Squeeze button: calibrate paddles\nAction/Squeeze button again: Project Paddle";
     infoText.resizeToFit = true;
     infoText.color = "white";
-    infoText.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+    infoText.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
     infoText.fontSize = 40;
     
-    var infoTexture = GUI.AdvancedDynamicTexture.CreateForMesh(infoUi, 1024, 1024);
+    var infoTexture = AdvancedDynamicTexture.CreateForMesh(infoUi, 1024, 1024);
     infoTexture.addControl(infoText);
     
     // infoUi.rotateAround(new Vector3(0, 1, 0), new Vector3(0, 1, 0), Math.PI/4);
@@ -441,7 +438,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     var skybox = Mesh.CreateBox("skyBox", 1000, scene);
     var skyboxMaterial = new StandardMaterial("skyBox", scene);
     skyboxMaterial.backFaceCulling = false;
-    skyboxMaterial.reflectionTexture = new CubeTexture("src/textures/skybox3", scene);
+    skyboxMaterial.reflectionTexture = new CubeTexture("./js/textures/skybox3", scene);
     skyboxMaterial.reflectionTexture.coordinatesMode = Texture.SKYBOX_MODE;
     skyboxMaterial.diffuseColor = new Color3(0, 0, 0);
     skyboxMaterial.specularColor = new Color3(0, 0, 0);
@@ -449,7 +446,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     skybox.material = skyboxMaterial;
             
     // Ground, not really used
-    var groundTexture = new Texture("src/textures/grass.dds", scene);
+    var groundTexture = new Texture("./js/textures/grass.dds", scene);
     var groundMaterial = new StandardMaterial("groundMaterial", scene);
     groundMaterial.diffuseTexture = groundTexture;
     let ground: Mesh = MeshBuilder.CreateGround("ground", {
@@ -471,7 +468,7 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     waterMesh.position.y = 0.35;
     var water = new WaterMaterial("water", scene, new Vector2(512, 512));
     water.backFaceCulling = true;
-    water.bumpTexture = new Texture("src/textures/waterbump.png", scene);
+    water.bumpTexture = new Texture("./js/textures/waterbump.png", scene);
     water.windForce = 2;
     
     water.waveHeight = .05;
