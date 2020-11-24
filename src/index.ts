@@ -311,7 +311,7 @@ const createPaddle = function(scene: Scene) {
  * @param rotAmount How much should we rotate around the origin
  * @param around what point should we rotate around. Default is (0,1,0)
  */
-const createVideoPillar = function(xrHelper: WebXRDefaultExperience, videoName: String,  pos: Vector3, scene: Scene, rotAmount: number, around: Vector3 = new Vector3(0,1,0)) {
+const createVideoPillar = function(xrHelper: WebXRDefaultExperience, videoName: String,  pos: Vector3, scene: Scene, rotAmount: number, videoURL: string | undefined = undefined, around: Vector3 = new Vector3(0,1,0)) {
     var pillar = MeshBuilder.CreateBox('pillar' + videoName, {
         width: 1.5,
         height: 7,
@@ -339,8 +339,12 @@ const createVideoPillar = function(xrHelper: WebXRDefaultExperience, videoName: 
     pillar.addChild(screen)
 
     pillar.rotateAround(new Vector3(0, 1, 0), around, rotAmount)
-
-    var vTexture = new VideoTexture(videoName + '', './docs/js/videos/' + videoName + '.mp4', scene);
+    var vTexture: VideoTexture;
+    if (videoURL === undefined) {
+        vTexture = new VideoTexture(videoName + '', './docs/js/videos/' + videoName + '.mp4', scene);
+    } else {
+        vTexture = new VideoTexture(videoName + '', videoURL, scene);
+    }
     vTexture.video.autoplay=false;
     var vMat = new StandardMaterial('FMat', scene);
     vMat.emissiveColor = new Color3(1,1,1);
@@ -495,9 +499,9 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     const availableFeatures = WebXRFeaturesManager.GetAvailableFeatures();
 
     //Create the forward video near spawn
-    createVideoPillar(xrHelper, 'forward', new Vector3(0, 1, 3), scene, Math.PI/4);
+    createVideoPillar(xrHelper, 'forward', new Vector3(0, 1, 3), scene, Math.PI/4, "https://www.youtube.com/watch?v=ZmECEQPuZP8&feature=youtu.be");
     // Create the sweep video directly in fron of user
-    createVideoPillar(xrHelper, 'sweep', new Vector3(0, 1, 12), scene, 0);
+    createVideoPillar(xrHelper, 'sweep', new Vector3(0, 1, 12), scene, 0, "https://www.youtube.com/watch?v=ZmECEQPuZP8&feature=youtu.be");
     // Initialize the paddle
     createPaddle(scene);
 

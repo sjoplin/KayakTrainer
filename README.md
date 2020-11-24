@@ -22,6 +22,11 @@ In addition to node, you should make sure a recent (e.g., version 3.9 or later) 
 
 Finally, we will use the node `npx` command to both build the project (with webpack) and run a local http webserver on your machine.  The ```package.json``` is set up to run this server 
 
+## Credits
+The textures were taken from the BabylonJS website used in this tutorial https://playground.babylonjs.com/#1SLLOJ#15 
+
+The videos were taken off of Jez Blanchard's youtube channel https://www.youtube.com/user/paddleeducation 
+
 ## Running 
 
 You set up the initial project by pulling the dependencies from npm with 
