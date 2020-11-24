@@ -340,7 +340,7 @@ const createVideoPillar = function(xrHelper: WebXRDefaultExperience, videoName: 
 
     pillar.rotateAround(new Vector3(0, 1, 0), around, rotAmount)
 
-    var vTexture = new VideoTexture(videoName + '', './src/videos/' + videoName + '.mp4', scene);
+    var vTexture = new VideoTexture(videoName + '', './docs/js/videos/' + videoName + '.mp4', scene);
     vTexture.video.autoplay=false;
     var vMat = new StandardMaterial('FMat', scene);
     vMat.emissiveColor = new Color3(1,1,1);
