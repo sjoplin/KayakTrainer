@@ -499,9 +499,9 @@ const createScene = async function(engine: Engine, canvas: HTMLCanvasElement) {
     const availableFeatures = WebXRFeaturesManager.GetAvailableFeatures();
 
     //Create the forward video near spawn
-    createVideoPillar(xrHelper, 'forward', new Vector3(0, 1, 3), scene, Math.PI/4, "https://www.youtube.com/watch?v=ZmECEQPuZP8&feature=youtu.be");
+    createVideoPillar(xrHelper, 'forward', new Vector3(0, 1, 3), scene, Math.PI/4, "https://www.dropbox.com/s/yetaa8ff6q1q84s/forward.mp4?dl=1");
     // Create the sweep video directly in fron of user
-    createVideoPillar(xrHelper, 'sweep', new Vector3(0, 1, 12), scene, 0, "https://www.youtube.com/watch?v=ZmECEQPuZP8&feature=youtu.be");
+    createVideoPillar(xrHelper, 'sweep', new Vector3(0, 1, 12), scene, 0, "https://www.dropbox.com/s/n5a0bq7ignc1ucp/sweep.mp4?dl=1");
     // Initialize the paddle
     createPaddle(scene);
 
